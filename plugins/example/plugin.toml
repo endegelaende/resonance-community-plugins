@@ -1,8 +1,0 @@
-[plugin]
-name = "example"
-version = "0.1.0"
-description = "Example plugin — demonstrates the Resonance plugin API (commands, menus, events & persistence)"
-author = "Resonance"
-min_resonance_version = "0.1.0"
-category = "misc"
-tags = ["demo", "template", "example"]

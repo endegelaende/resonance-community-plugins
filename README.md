@@ -10,11 +10,7 @@ Plugins listed here appear in the **Available** tab of the Resonance Plugin Mana
 
 ## 📦 Available Plugins
 
-| Plugin | Version | Description |
-|--------|---------|-------------|
-| [example](plugins/example/) | 0.1.0 | API demo — demonstrates commands, menus, events & persistence |
-
-> More community plugins coming soon! See [Contributing](#-contributing) below.
+No community plugins published yet — be the first! See [Contributing](#-contributing) below.
 
 ---
 
@@ -69,7 +65,7 @@ community/
 │       ├── build-release.yml    # Builds ZIP + SHA for tagged releases
 │       └── update-index.yml     # Generates index.json → GitHub Pages
 ├── plugins/
-│   └── example/                 # One folder per plugin
+│   └── your-plugin/             # One folder per plugin
 │       ├── plugin.toml          # Plugin manifest (name, version, etc.)
 │       ├── __init__.py          # Plugin source code
 │       └── ...
@@ -87,18 +83,18 @@ The `index.json` served via GitHub Pages has this structure:
   "generated": "2025-01-15T12:00:00Z",
   "plugins": [
     {
-      "name": "example",
-      "version": "0.1.0",
-      "description": "API demo plugin",
-      "author": "Resonance",
-      "category": "misc",
+      "name": "my-plugin",
+      "version": "1.0.0",
+      "description": "A cool community plugin",
+      "author": "Your Name",
+      "category": "tools",
       "icon": "",
       "min_resonance_version": "0.1.0",
-      "url": "https://github.com/resonance-plugins/community/releases/download/example-v0.1.0/example-0.1.0.zip",
+      "url": "https://github.com/endegelaende/resonance-community-plugins/releases/download/my-plugin-v1.0.0/my-plugin-1.0.0.zip",
       "sha256": "abc123...",
-      "homepage": "https://github.com/resonance-plugins/community/tree/main/plugins/example",
+      "homepage": "https://github.com/endegelaende/resonance-community-plugins/tree/main/plugins/my-plugin",
       "changelog": "",
-      "tags": ["demo", "template"]
+      "tags": ["utility"]
     }
   ]
 }
@@ -120,7 +116,7 @@ The `index.json` served via GitHub Pages has this structure:
 ```json
 {
   "method": "slim.request",
-  "params": ["-", ["pluginmanager", "installrepo", "name:example"]]
+  "params": ["-", ["pluginmanager", "installrepo", "name:my-plugin"]]
 }
 ```
 
@@ -186,8 +182,8 @@ Releases are created automatically when you push a version tag:
 
 ```bash
 # After merging a plugin update:
-git tag example-v0.1.0
-git push origin example-v0.1.0
+git tag my-plugin-v1.0.0
+git push origin my-plugin-v1.0.0
 ```
 
 The `build-release.yml` workflow will:

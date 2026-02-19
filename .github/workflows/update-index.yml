@@ -101,32 +101,75 @@ jobs:
                       return None
 
 
+                  def get_release_assets(tag: str) -> list[dict]:
+                      """Fetch full asset details for a release tag via gh release view."""
+                      try:
+                          result = subprocess.run(
+                              ["gh", "release", "view", tag, "--json", "assets"],
+                              capture_output=True, text=True, check=True,
+                          )
+                          data = json.loads(result.stdout)
+                          return data.get("assets", [])
+                      except (subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+                          print(f"  Warning: could not fetch assets for {tag}: {exc}", file=sys.stderr)
+                          return []
+
+
+                  def download_sha_file(tag: str, sha_filename: str) -> str:
+                      """Download a .sha256 file from a release and return the checksum string."""
+                      import tempfile
+                      with tempfile.TemporaryDirectory() as tmpdir:
+                          try:
+                              subprocess.run(
+                                  ["gh", "release", "download", tag,
+                                   "--pattern", sha_filename,
+                                   "--dir", tmpdir],
+                                  capture_output=True, text=True, check=True,
+                              )
+                              sha_path = Path(tmpdir) / sha_filename
+                              if sha_path.exists():
+                                  content = sha_path.read_text().strip()
+                                  # Format is either just the hash or "hash  filename"
+                                  return content.split()[0] if content else ""
+                          except subprocess.CalledProcessError as exc:
+                              print(f"  Warning: could not download {sha_filename}: {exc}", file=sys.stderr)
+                      return ""
+
+
                   def extract_release_info(plugin_name: str, release: dict) -> tuple[str, str, str]:
                       """Extract download URL, SHA-256, and version from a release."""
                       tag = release["tagName"]
                       version = tag.split("-v", 1)[1] if "-v" in tag else ""
 
+                      # Fetch full asset details (with downloadUrl) via gh release view
+                      assets = get_release_assets(tag)
+
                       zip_url = ""
                       sha256 = ""
+                      sha_filename = ""
 
-                      for asset in release.get("assets", []):
+                      for asset in assets:
                           asset_name = asset.get("name", "")
+                          # gh release view --json assets returns "url" as the browser
+                          # download URL (not the API URL that gh release list returns)
                           asset_url = asset.get("url", "")
 
                           if asset_name.endswith(".zip") and not asset_name.endswith(".sha256"):
                               zip_url = asset_url
                           elif asset_name.endswith(".sha256"):
-                              # Download the SHA file to read the checksum
-                              try:
-                                  sha_result = subprocess.run(
-                                      ["gh", "release", "download", tag,
-                                       "--pattern", asset_name,
-                                       "--output", "-"],
-                                      capture_output=True, text=True, check=True,
-                                  )
-                                  sha256 = sha_result.stdout.strip().split()[0]
-                              except subprocess.CalledProcessError:
-                                  pass
+                              sha_filename = asset_name
+
+                      # Download the .sha256 file separately to read the checksum
+                      if sha_filename:
+                          sha256 = download_sha_file(tag, sha_filename)
+
+                      # Fallback: construct the expected download URL from the tag
+                      if not zip_url and version:
+                          repo = os.environ.get("GITHUB_REPOSITORY", "resonance-plugins/community")
+                          zip_url = (
+                              f"https://github.com/{repo}/releases/download/"
+                              f"{tag}/{plugin_name}-{version}.zip"
+                          )
 
                       return zip_url, sha256, version
 

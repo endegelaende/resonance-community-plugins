@@ -186,14 +186,14 @@ jobs:
 
                   def main():
                       plugins_dir = Path("plugins")
-                      if not plugins_dir.is_dir():
-                          print("Error: plugins/ directory not found", file=sys.stderr)
-                          sys.exit(1)
-
                       repo = REPO
-
                       plugins = []
-                      plugin_dirs = sorted(p for p in plugins_dir.iterdir() if p.is_dir())
+
+                      if not plugins_dir.is_dir():
+                          print("No plugins/ directory found — generating empty index")
+                          plugin_dirs = []
+                      else:
+                          plugin_dirs = sorted(p for p in plugins_dir.iterdir() if p.is_dir())
 
                       for plugin_path in plugin_dirs:
                           toml_path = plugin_path / "plugin.toml"

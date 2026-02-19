@@ -1,0 +1,162 @@
+# Build & Release workflow for Resonance community plugins.
+#
+# Triggered when a tag matching "<plugin-name>-v<version>" is pushed.
+# Example: pushing tag "example-v0.1.0" will:
+#   1. Extract plugin name ("example") and version ("0.1.0") from the tag
+#   2. Validate that plugins/<name>/plugin.toml exists and version matches
+#   3. Package the plugin directory into a ZIP archive
+#   4. Compute SHA-256 checksum
+#   5. Create a GitHub Release with the ZIP and checksum attached
+#   6. Trigger the index update workflow to regenerate index.json
+
+name: Build Plugin Release
+
+on:
+    push:
+        tags:
+            - "*-v[0-9]*"
+
+permissions:
+    contents: write
+    actions: write
+
+jobs:
+    build-release:
+        name: Package & Release
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Parse tag into plugin name and version
+              id: parse
+              run: |
+                  TAG="${GITHUB_REF#refs/tags/}"
+                  echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+                  # Split on the last occurrence of "-v" to handle plugin names with hyphens
+                  # e.g. "my-cool-plugin-v1.2.3" -> name="my-cool-plugin", version="1.2.3"
+                  PLUGIN_NAME="${TAG%-v*}"
+                  PLUGIN_VERSION="${TAG##*-v}"
+
+                  if [ -z "$PLUGIN_NAME" ] || [ -z "$PLUGIN_VERSION" ]; then
+                    echo "::error::Could not parse plugin name and version from tag '$TAG'"
+                    echo "::error::Expected format: <plugin-name>-v<version> (e.g. example-v0.1.0)"
+                    exit 1
+                  fi
+
+                  echo "plugin_name=$PLUGIN_NAME" >> "$GITHUB_OUTPUT"
+                  echo "plugin_version=$PLUGIN_VERSION" >> "$GITHUB_OUTPUT"
+                  echo "Plugin: $PLUGIN_NAME v$PLUGIN_VERSION"
+
+            - name: Validate plugin directory exists
+              run: |
+                  PLUGIN_DIR="plugins/${{ steps.parse.outputs.plugin_name }}"
+                  if [ ! -d "$PLUGIN_DIR" ]; then
+                    echo "::error::Plugin directory '$PLUGIN_DIR' does not exist"
+                    exit 1
+                  fi
+                  if [ ! -f "$PLUGIN_DIR/plugin.toml" ]; then
+                    echo "::error::Missing plugin.toml in '$PLUGIN_DIR'"
+                    exit 1
+                  fi
+                  if [ ! -f "$PLUGIN_DIR/__init__.py" ]; then
+                    echo "::error::Missing __init__.py in '$PLUGIN_DIR'"
+                    exit 1
+                  fi
+                  echo "Plugin directory validated"
+
+            - name: Validate version in plugin.toml matches tag
+              run: |
+                  PLUGIN_DIR="plugins/${{ steps.parse.outputs.plugin_name }}"
+                  TOML_VERSION=$(grep -E '^version\s*=' "$PLUGIN_DIR/plugin.toml" | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
+                  TAG_VERSION="${{ steps.parse.outputs.plugin_version }}"
+
+                  if [ "$TOML_VERSION" != "$TAG_VERSION" ]; then
+                    echo "::error::Version mismatch: plugin.toml says '$TOML_VERSION' but tag says '$TAG_VERSION'"
+                    exit 1
+                  fi
+                  echo "Version match: $TAG_VERSION"
+
+            - name: Package plugin into ZIP
+              id: package
+              run: |
+                  PLUGIN_NAME="${{ steps.parse.outputs.plugin_name }}"
+                  PLUGIN_VERSION="${{ steps.parse.outputs.plugin_version }}"
+                  ZIP_NAME="${PLUGIN_NAME}-${PLUGIN_VERSION}.zip"
+
+                  # Create ZIP with the plugin directory at the root level.
+                  # The ZIP will contain: <plugin_name>/<files...>
+                  # This matches the format expected by PluginInstaller.install_from_zip()
+                  # which handles prefix stripping.
+                  cd plugins
+                  zip -r "../${ZIP_NAME}" "$PLUGIN_NAME/" -x "*/__pycache__/*" "*/.*"
+                  cd ..
+
+                  echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+                  echo "zip_path=$(pwd)/$ZIP_NAME" >> "$GITHUB_OUTPUT"
+
+                  ls -lh "$ZIP_NAME"
+                  echo "Created $ZIP_NAME"
+
+            - name: Compute SHA-256 checksum
+              id: checksum
+              run: |
+                  ZIP_NAME="${{ steps.package.outputs.zip_name }}"
+                  SHA256=$(sha256sum "$ZIP_NAME" | awk '{print $1}')
+
+                  echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+                  echo "$SHA256  $ZIP_NAME" > "${ZIP_NAME}.sha256"
+
+                  echo "SHA-256: $SHA256"
+
+            - name: Extract release notes from plugin description
+              id: notes
+              run: |
+                  PLUGIN_DIR="plugins/${{ steps.parse.outputs.plugin_name }}"
+                  PLUGIN_NAME="${{ steps.parse.outputs.plugin_name }}"
+                  PLUGIN_VERSION="${{ steps.parse.outputs.plugin_version }}"
+                  DESCRIPTION=$(grep -E '^description\s*=' "$PLUGIN_DIR/plugin.toml" | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
+                  AUTHOR=$(grep -E '^author\s*=' "$PLUGIN_DIR/plugin.toml" | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
+
+                  {
+                    echo "## ${PLUGIN_NAME} v${PLUGIN_VERSION}"
+                    echo ""
+                    echo "${DESCRIPTION}"
+                    echo ""
+                    echo "**Author:** ${AUTHOR}"
+                    echo ""
+                    echo "### Installation"
+                    echo ""
+                    echo "Install via the Resonance Plugin Manager UI (**Settings > Plugins > Available**) or via JSON-RPC:"
+                    echo ""
+                    echo '```json'
+                    echo "{\"method\": \"slim.request\", \"params\": [\"-\", [\"pluginmanager\", \"installrepo\", \"name:${PLUGIN_NAME}\"]]}"
+                    echo '```'
+                    echo ""
+                    echo "### Checksums"
+                    echo ""
+                    echo "| File | SHA-256 |"
+                    echo "|------|---------|"
+                    echo "| \`${{ steps.package.outputs.zip_name }}\` | \`${{ steps.checksum.outputs.sha256 }}\` |"
+                  } > release_notes.md
+
+                  cat release_notes.md
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ steps.parse.outputs.tag }}
+                  name: "${{ steps.parse.outputs.plugin_name }} v${{ steps.parse.outputs.plugin_version }}"
+                  body_path: release_notes.md
+                  files: |
+                      ${{ steps.package.outputs.zip_name }}
+                      ${{ steps.package.outputs.zip_name }}.sha256
+                  fail_on_unmatched_files: true
+
+            - name: Trigger index update
+              run: |
+                  gh workflow run update-index.yml
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

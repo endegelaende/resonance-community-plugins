@@ -15,9 +15,10 @@ Plugins listed here appear in the **Available** tab of the Resonance Plugin Mana
 
 ## 📦 Available Plugins
 
-| Plugin                            | Version | Description                                                                                                                                                                                                      | Author     |
-| --------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| [raopbridge](plugins/raopbridge/) | 0.2.0   | AirPlay bridge — uses philippe44's squeeze2raop to make AirPlay devices available as Squeezebox players. Full Web UI via Server-Driven UI (SDUI) with device management, settings, and per-device configuration. | Pinoatrome |
+| Plugin                              | Version | Description                                                                                                                                                                                                      | Author              |
+| ----------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| [raopbridge](plugins/raopbridge/)   | 0.2.0   | AirPlay bridge — uses philippe44's squeeze2raop to make AirPlay devices available as Squeezebox players. Full Web UI via Server-Driven UI (SDUI) with device management, settings, and per-device configuration. | Pinoatrome          |
+| [sleep-timer](plugins/sleep-timer/) | 1.0.0   | Sleep timer with configurable fade-out, multi-player support, and SDUI dashboard. Presets (15/30/45/60/90 min), custom durations, volume restore, timer history, and Jive menu integration.                      | Resonance Community |
 
 ---
 
@@ -72,12 +73,18 @@ resonance-community-plugins/
 │       ├── build-release.yml    # Builds ZIP + SHA for tagged releases
 │       └── update-index.yml     # Generates index.json → GitHub Pages
 ├── plugins/
-│   └── raopbridge/              # One folder per plugin
-│       ├── plugin.toml          # Plugin manifest (name, version, etc.)
-│       ├── __init__.py          # Plugin entry point (setup/teardown/get_ui)
-│       ├── bridge.py            # AirPlay bridge subprocess management
-│       ├── config.py            # Device & config XML parsing
-│       └── tests/               # Plugin test suite
+│   ├── raopbridge/              # AirPlay bridge plugin
+│   │   ├── plugin.toml          # Plugin manifest (name, version, etc.)
+│   │   ├── __init__.py          # Plugin entry point (setup/teardown/get_ui)
+│   │   ├── bridge.py            # AirPlay bridge subprocess management
+│   │   ├── config.py            # Device & config XML parsing
+│   │   └── tests/               # Plugin test suite
+│   └── sleep-timer/             # Sleep timer plugin
+│       ├── plugin.toml          # Plugin manifest with 6 declarative settings
+│       ├── __init__.py          # SDUI dashboard, actions, JSON-RPC commands
+│       ├── timer.py             # SleepTimer + SleepTimerManager (fade-out engine)
+│       ├── store.py             # Timer history persistence (JSON)
+│       └── tests/               # 65 tests
 ├── LICENSE
 └── README.md
 ```

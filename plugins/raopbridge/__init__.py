@@ -998,7 +998,7 @@ async def _deactivate() -> dict[str, Any]:
 
 
 async def _restart() -> dict[str, Any]:
-    """Restart the bridge using stored settings.
+    """Restart the plugin (and the bridge if active_at_startup) using stored settings.
 
     Call ``save`` beforehand to persist any changes.
     """
@@ -1010,6 +1010,8 @@ async def _restart() -> dict[str, Any]:
     _raop_bridge = RaopBridge.from_settings(settings_path)
     await _raop_bridge.start()
 
+    if _raop_bridge.active_at_startup:
+        await _raop_bridge.activate_bridge()
     return {"active": _raop_bridge.is_active}
 
 

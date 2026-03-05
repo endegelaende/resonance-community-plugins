@@ -28,3 +28,7 @@ Thumbs.db
 
 # Generated
 _site/
+
+# AI Assistant Context (local only)
+CLAUDE.md
+.claude/

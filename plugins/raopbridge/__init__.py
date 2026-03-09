@@ -868,7 +868,7 @@ def _build_about_tab() -> Tab:
 # ---------------------------------------------------------------------------
 
 
-async def handle_action(action: str, params: dict[str, Any]) -> dict[str, Any]:
+async def handle_action(action: str, params: dict[str, Any], ctx: PluginContext) -> dict[str, Any]:
     """Handle SDUI action dispatches from the frontend."""
 
     # Actions that work even without a bridge instance

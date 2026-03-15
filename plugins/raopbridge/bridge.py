@@ -559,6 +559,43 @@ class RaopBridge:
         del raop_config.devices[index]
         self.save_config(raop_config, timestamp=timestamp)
 
+    def get_bridge_log_path(self) -> Path | None:
+        """Return the path to the bridge log file, or None if logging is disabled."""
+        if not self.logging_enabled:
+            return None
+        return Path(self.data_dir) / self.logging_file
+
+    def read_bridge_log(self, limit: int = 100) -> list[str]:
+        """Read the last *limit* lines from the bridge log file.
+
+        Returns an empty list if the file does not exist or logging is
+        disabled.  Lines are returned oldest-first.
+        """
+        log_path = self.get_bridge_log_path()
+        if log_path is None or not log_path.is_file():
+            return []
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
+                # Read all lines and return the tail — squeeze2raop logs
+                # are small enough that this is fine.
+                lines = fh.read().splitlines()
+            return lines[-limit:] if len(lines) > limit else lines
+        except OSError as exc:
+            logger.warning("Could not read bridge log %s: %s", log_path, exc)
+            return []
+
+    def clear_bridge_log(self) -> None:
+        """Truncate the bridge log file."""
+        log_path = self.get_bridge_log_path()
+        if log_path is None:
+            return
+        try:
+            if log_path.is_file():
+                log_path.write_text("", encoding="utf-8")
+                logger.debug("Bridge log cleared: %s", log_path)
+        except OSError as exc:
+            logger.warning("Could not clear bridge log %s: %s", log_path, exc)
+
     async def close(self) -> None:
         self.deactivate_bridge()
         logger.debug("RaopBridge closed")

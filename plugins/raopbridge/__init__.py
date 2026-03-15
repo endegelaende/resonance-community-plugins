@@ -323,8 +323,59 @@ def _build_startup_error_card(error_msg: str) -> Card:
     )
 
 
-def _build_log_card(*, collapsed: bool = False) -> Card:
-    """Build a card showing recent plugin log entries."""
+def _build_bridge_log_card(*, collapsed: bool = False) -> Card:
+    """Build a card showing the squeeze2raop process log output."""
+    if _raop_bridge is None:
+        return Card(
+            title="Bridge Logs",
+            collapsible=True,
+            collapsed=collapsed,
+            children=[Text("Bridge not initialised.", color="gray", size="sm")],
+        )
+
+    lines = _raop_bridge.read_bridge_log(limit=100)
+    children: list = []
+
+    if not lines:
+        log_path = _raop_bridge.get_bridge_log_path()
+        if log_path and not log_path.is_file():
+            children.append(
+                Text(
+                    "No bridge log file yet — start the bridge to generate logs.",
+                    color="gray",
+                    size="sm",
+                )
+            )
+        else:
+            children.append(Text("Bridge log is empty.", color="gray", size="sm"))
+    else:
+        md_content = "```\n" + "\n".join(lines) + "\n```"
+        children.append(Markdown(md_content))
+
+    children.append(
+        Row(
+            children=[
+                Button(
+                    "Clear Bridge Logs",
+                    action="clear_bridge_logs",
+                    style="secondary",
+                ),
+            ],
+            gap="3",
+            justify="end",
+        )
+    )
+
+    return Card(
+        title=f"Bridge Logs ({len(lines)} lines)",
+        collapsible=True,
+        collapsed=collapsed,
+        children=children,
+    )
+
+
+def _build_plugin_log_card(*, collapsed: bool = True) -> Card:
+    """Build a card showing recent plugin log entries (Python logger)."""
     log_entries = get_recent_logs(limit=50)
     log_stats = get_log_stats()
 
@@ -333,7 +384,6 @@ def _build_log_card(*, collapsed: bool = False) -> Card:
     if not log_entries:
         children.append(Text("No log entries captured yet.", color="gray", size="sm"))
     else:
-        # Build a markdown code block with the log entries
         log_lines: list[str] = []
         for entry in log_entries:
             level_icon = {
@@ -360,7 +410,7 @@ def _build_log_card(*, collapsed: bool = False) -> Card:
     children.append(
         Row(
             children=[
-                Button("Clear Logs", action="clear_logs", style="secondary"),
+                Button("Clear Plugin Logs", action="clear_logs", style="secondary"),
             ],
             gap="3",
             justify="end",
@@ -375,12 +425,20 @@ def _build_log_card(*, collapsed: bool = False) -> Card:
     )
 
 
+def _build_log_card(*, collapsed: bool = False) -> Card:
+    """Build a combined log card (for error/fallback pages without tabs)."""
+    return _build_plugin_log_card(collapsed=collapsed)
+
+
 def _build_log_tab() -> Tab:
-    """Build the Log tab for the tabbed interface."""
+    """Build the Log tab — bridge logs first, plugin logs collapsed below."""
     return Tab(
         label="Logs",
         icon="scroll-text",
-        children=[_build_log_card(collapsed=False)],
+        children=[
+            _build_bridge_log_card(collapsed=False),
+            _build_plugin_log_card(collapsed=True),
+        ],
     )
 
 
@@ -575,7 +633,10 @@ def _build_device_modal(device: RaopDevice) -> Modal:
             name="volume_mode",
             label="Volume Mode",
             value=str(common.volume_mode),
-            options=[SelectOption(value=str(k), label=v) for k, v in _VOLUME_MODE_LABELS.items()]
+            options=[
+                SelectOption(value=str(k), label=v)
+                for k, v in _VOLUME_MODE_LABELS.items()
+            ],
         ),
         KeyValue(
             items=[
@@ -864,7 +925,9 @@ def _build_about_tab() -> Tab:
 # ---------------------------------------------------------------------------
 
 
-async def handle_action(action: str, params: dict[str, Any], ctx: PluginContext) -> dict[str, Any]:
+async def handle_action(
+    action: str, params: dict[str, Any], ctx: PluginContext
+) -> dict[str, Any]:
     """Handle SDUI action dispatches from the frontend."""
 
     # Actions that work even without a bridge instance
@@ -872,6 +935,10 @@ async def handle_action(action: str, params: dict[str, Any], ctx: PluginContext)
         case "clear_logs":
             clear_logs()
             return {"message": "Logs cleared"}
+        case "clear_bridge_logs":
+            if _raop_bridge is not None:
+                _raop_bridge.clear_bridge_log()
+            return {"message": "Bridge logs cleared"}
         case "retry_download":
             return await _handle_retry_download()
 

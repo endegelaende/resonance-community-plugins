@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest import mock
 
@@ -13,56 +14,65 @@ from raopbridge import RaopBridge, default_settings, format_server_setting
 
 
 class TestBridge:
-
     def test_default_preferences(self):
-        expected = 'test-static'
-        with mock.patch('raopbridge.bridge.define_valid_bin', return_value=[expected, 'test']) as mocked:
+        expected = "test-static"
+        with mock.patch(
+            "raopbridge.bridge.define_valid_bin", return_value=[expected, "test"]
+        ) as mocked:
             actual = default_settings()
             assert mocked.called
-        assert actual['bin'] == expected
+        assert actual["bin"] == expected
 
     def test_default_preferences_invalid(self):
-        with mock.patch('raopbridge.bridge.define_valid_bin', return_value=[]) as mocked:
+        with mock.patch(
+            "raopbridge.bridge.define_valid_bin", return_value=[]
+        ) as mocked:
             actual = default_settings()
             assert mocked.called
-        assert actual['bin'] is None
+        assert actual["bin"] is None
 
     def test_format_server_setting_empty(self):
-        expected = '?'
+        expected = "?"
         actual = format_server_setting()
         assert actual == expected
 
     def test_format_server_setting_generic(self):
-        expected = '127.0.0.1:3456'
-        actual = format_server_setting(host='0.0.0.0', port=3456)
+        expected = "127.0.0.1:3456"
+        actual = format_server_setting(host="0.0.0.0", port=3456)
         assert actual == expected
 
     def test_format_server_setting_complete(self):
-        expected = '127.0.0.2:3456'
-        actual = format_server_setting(host='127.0.0.2', port=3456)
+        expected = "127.0.0.2:3456"
+        actual = format_server_setting(host="127.0.0.2", port=3456)
         assert actual == expected
 
     def test_from_settings(self) -> None:
-        with mock.patch('raopbridge.bridge.load_settings', return_value=default_settings()) as mocked:
-            instance = RaopBridge.from_settings(Path('/tmp'))
+        with mock.patch(
+            "raopbridge.bridge.load_settings", return_value=default_settings()
+        ) as mocked:
+            instance = RaopBridge.from_settings(Path("/tmp"))
             assert mocked.called
-        assert instance.data_dir == str(Path('/tmp').parent)
+        assert instance.data_dir == str(Path("/tmp").parent)
 
     def test_build_bin_args(self, raop_bridge_factory) -> None:
         p = raop_bridge_factory()
-        expected = f'-Z -I -p {p.pid_file} -b {p.interface} -s {p.server} -f {p.logging_file} -x {p.config}'.split(' ')
+        expected = f"-Z -I -p {p.pid_file} -b {p.interface} -s {p.server} -f {p.logging_file} -x {p.config}".split(
+            " "
+        )
         actual = p.build_bin_args()
         assert actual == expected
 
     @pytest.mark.asyncio
     async def test_start_active(self, raop_bridge_factory, popen_factory) -> None:
         p = raop_bridge_factory(active_at_startup=True)
-        with mock.patch('raopbridge.bridge.ensure_binary') as mocked_ensure:
-            with mock.patch('raopbridge.bridge.check_valid_bin') as mocked_bin:
+        with mock.patch("raopbridge.bridge.ensure_binary") as mocked_ensure:
+            with mock.patch("raopbridge.bridge.check_valid_bin") as mocked_bin:
                 await p.start()
                 assert mocked_ensure.called
                 assert mocked_bin.called
-        with mock.patch('raopbridge.bridge.call_executable', return_value=popen_factory()) as mocked_exec:
+        with mock.patch(
+            "raopbridge.bridge.call_executable", return_value=popen_factory()
+        ) as mocked_exec:
             await p.activate_bridge()
             assert mocked_exec.called
         assert p.is_active
@@ -70,8 +80,8 @@ class TestBridge:
     @pytest.mark.asyncio
     async def test_start_inactive(self, raop_bridge_factory, popen_factory) -> None:
         p = raop_bridge_factory(active_at_startup=False)
-        with mock.patch('raopbridge.bridge.check_valid_bin') as mocked_bin:
-            with mock.patch('raopbridge.bridge.ensure_binary') as mocked_ensure:
+        with mock.patch("raopbridge.bridge.check_valid_bin") as mocked_bin:
+            with mock.patch("raopbridge.bridge.ensure_binary") as mocked_ensure:
                 await p.start()
                 assert mocked_ensure.called
                 assert mocked_bin.called
@@ -88,37 +98,109 @@ class TestBridge:
         p = raop_bridge_factory()
         raop_config = raop_config_factory()
         device = raop_config.devices[0]
-        with mock.patch.object(p, 'save_config', return_value=raop_config) as mocked_write:
-            with mock.patch('raopbridge.bridge.read_squeeze2raop_config', return_value=raop_config) as mocked_read:
+        with mock.patch.object(
+            p, "save_config", return_value=raop_config
+        ) as mocked_write:
+            with mock.patch(
+                "raopbridge.bridge.read_squeeze2raop_config", return_value=raop_config
+            ) as mocked_read:
                 await p.save_device(device)
                 assert mocked_read.called
             assert mocked_write.called
 
     @pytest.mark.asyncio
-    async def test_save_device_new(self, raop_bridge_factory, raop_config_factory, raop_device_factory) -> None:
+    async def test_save_device_new(
+        self, raop_bridge_factory, raop_config_factory, raop_device_factory
+    ) -> None:
         p = raop_bridge_factory()
         raop_config = raop_config_factory()
         device = raop_device_factory()
-        with mock.patch.object(p, 'save_config', return_value=raop_config) as mocked_write:
-            with mock.patch('raopbridge.bridge.read_squeeze2raop_config', return_value=raop_config) as mocked_read:
+        with mock.patch.object(
+            p, "save_config", return_value=raop_config
+        ) as mocked_write:
+            with mock.patch(
+                "raopbridge.bridge.read_squeeze2raop_config", return_value=raop_config
+            ) as mocked_read:
                 await p.save_device(device)
                 assert mocked_read.called
             assert mocked_write.called
 
     @pytest.mark.asyncio
-    async def test_remove_device(self, raop_bridge_factory, raop_config_factory, raop_device_factory) -> None:
+    async def test_remove_device(
+        self, raop_bridge_factory, raop_config_factory, raop_device_factory
+    ) -> None:
         p = raop_bridge_factory()
         raop_config = raop_config_factory()
         device = raop_config.devices[0]
-        with mock.patch.object(p, 'save_config', return_value=raop_config) as mocked_write:
-            with mock.patch('raopbridge.bridge.read_squeeze2raop_config', return_value=raop_config) as mocked_read:
+        with mock.patch.object(
+            p, "save_config", return_value=raop_config
+        ) as mocked_write:
+            with mock.patch(
+                "raopbridge.bridge.read_squeeze2raop_config", return_value=raop_config
+            ) as mocked_read:
                 await p.remove_device(device.udn)
                 assert mocked_read.called
             assert mocked_write.called
 
-    def test_save_config_stale(self, tmp_path, raop_bridge_factory, raop_config_factory, raop_device_factory) -> None:
+    def test_get_bridge_log_path(self, raop_bridge_factory) -> None:
+        p = raop_bridge_factory()
+        log_path = p.get_bridge_log_path()
+        assert log_path is not None
+        assert log_path.name == "squeeze2raop.log"
+
+    def test_get_bridge_log_path_disabled(self, raop_bridge_factory) -> None:
+        p = raop_bridge_factory(logging_enabled=False)
+        assert p.get_bridge_log_path() is None
+
+    def test_read_bridge_log_empty(self, tmp_path, raop_bridge_factory) -> None:
+        p = raop_bridge_factory(data_dir=str(tmp_path))
+        assert p.read_bridge_log() == []
+
+    def test_read_bridge_log(self, tmp_path, raop_bridge_factory) -> None:
+        p = raop_bridge_factory(data_dir=str(tmp_path))
+        log_path = tmp_path / p.logging_file
+        log_path.write_text("line 1\nline 2\nline 3\n", encoding="utf-8")
+        lines = p.read_bridge_log()
+        assert lines == ["line 1", "line 2", "line 3"]
+
+    def test_read_bridge_log_limit(self, tmp_path, raop_bridge_factory) -> None:
+        p = raop_bridge_factory(data_dir=str(tmp_path))
+        log_path = tmp_path / p.logging_file
+        all_lines = [f"line {i}" for i in range(50)]
+        log_path.write_text("\n".join(all_lines) + "\n", encoding="utf-8")
+        lines = p.read_bridge_log(limit=10)
+        assert len(lines) == 10
+        assert lines[0] == "line 40"
+        assert lines[-1] == "line 49"
+
+    def test_read_bridge_log_disabled(self, tmp_path, raop_bridge_factory) -> None:
+        p = raop_bridge_factory(data_dir=str(tmp_path), logging_enabled=False)
+        assert p.read_bridge_log() == []
+
+    def test_clear_bridge_log(self, tmp_path, raop_bridge_factory) -> None:
+        p = raop_bridge_factory(data_dir=str(tmp_path))
+        log_path = tmp_path / p.logging_file
+        log_path.write_text("some log content\n", encoding="utf-8")
+        assert log_path.stat().st_size > 0
+        p.clear_bridge_log()
+        assert log_path.read_text(encoding="utf-8") == ""
+
+    def test_clear_bridge_log_no_file(self, tmp_path, raop_bridge_factory) -> None:
+        """clear_bridge_log should not raise when log file does not exist."""
+        p = raop_bridge_factory(data_dir=str(tmp_path))
+        p.clear_bridge_log()  # should not raise
+
+    def test_clear_bridge_log_disabled(self, tmp_path, raop_bridge_factory) -> None:
+        """clear_bridge_log is a no-op when logging is disabled."""
+        p = raop_bridge_factory(data_dir=str(tmp_path), logging_enabled=False)
+        p.clear_bridge_log()  # should not raise
+
+    def test_save_config_stale(
+        self, tmp_path, raop_bridge_factory, raop_config_factory, raop_device_factory
+    ) -> None:
         import tempfile
-        with tempfile.NamedTemporaryFile(dir=tmp_path, suffix='.xml') as fp:
+
+        with tempfile.NamedTemporaryFile(dir=tmp_path, suffix=".xml") as fp:
             path = Path(fp.name)
             p = raop_bridge_factory(data_dir=path.parent.name, config=path.name)
             raop_config = raop_config_factory()
@@ -131,6 +213,8 @@ class TestBridge:
                     p.save_config(raop_config, timestamp=old_timestamp)
             finally:
                 import os
+
                 os.remove(Path(p.data_dir) / p.config)
                 import shutil
+
                 shutil.rmtree(p.data_dir)
